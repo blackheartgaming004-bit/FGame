@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Menu Trò Chơi Cờ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: #0f172a;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            transition: transform 0.2s ease, background 0.2s ease;
+            touch-action: manipulation; /* Tối ưu cho cảm ứng Android */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Hiệu ứng khi nhấn (Active state) cho mobile */
+        .game-card:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .game-icon {
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.1));
+            pointer-events: none; /* Tránh cản trở sự kiện click */
+        }
+
+        .btn-action {
+            pointer-events: none; /* Nút chỉ để trang trí, click ăn vào thẻ cha */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="w-full max-w-lg">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                CHỌN TRÒ CHƠI
+            </h1>
+            <p class="text-slate-400 text-sm">Chạm vào một trò chơi để bắt đầu</p>
+        </header>
+
+        <div class="space-y-6">
+            <!-- Thẻ Cờ Vua -->
+            <a href="CoVua.html" class="game-card p-6 flex items-center gap-6 shadow-xl block">
+    <div class="w-24 h-24 flex-shrink-0 bg-white/5 rounded-2xl p-3">
+        <img src="icon_co_vua.png" alt="Cờ Vua" class="game-icon w-full h-full object-contain">
+    </div>
+    <div class="flex-grow">
+        <h2 class="text-2xl font-bold">CỜ VUA</h2>
+        <p class="text-slate-400 text-xs mb-3">Western Chess</p>
+        <div class="bg-blue-600 px-4 py-1.5 rounded-lg text-xs font-bold inline-block">VÀO GAME</div>
+    </div>
+</a>
+            <!-- Thẻ Cờ Tướng -->
+            <div id="btn-xiangqi" class="game-card p-6 flex items-center gap-6 shadow-xl">
+                <div class="w-24 h-24 flex-shrink-0 bg-white/5 rounded-2xl p-3">
+                    <img src="icon_co_tuong.png" alt="Cờ Tướng" class="game-icon w-full h-full object-contain" 
+                         onerror="this.src='https://cdn-icons-png.flaticon.com/512/10046/10046808.png'">
+                </div>
+                <div class="flex-grow">
+                    <h2 class="text-2xl font-bold">CỜ TƯỚNG</h2>
+                    <p class="text-slate-400 text-xs mb-3">Xiangqi</p>
+                    <div class="btn-action inline-block bg-emerald-600 px-4 py-1.5 rounded-lg text-xs font-bold">VÀO GAME</div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-500 text-[10px] uppercase tracking-widest">
+            Phiên bản di động v2.0
+        </footer>
+    </div>
+
+    <script>
+        // Hàm chuyển trang an toàn cho Android
+        function openGame(fileName) {
+            // Mã hóa tên tệp để xử lý dấu cách (vd: "Co Vua.html" -> "Co%20Vua.html")
+            const safePath = encodeURI(fileName);
+            window.location.href = safePath;
+        }
+
+    </script>
+</body>
+</html>
+

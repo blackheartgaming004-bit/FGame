@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cờ Tướng</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+    /* Đường dẫn đến file ảnh cục bộ của bạn */
+    --board-bg: url('background_cotuong_galaxy.jpg'); 
+    --line-color: #ffffff; /* Đổi màu đường kẻ sang trắng để dễ nhìn trên nền tối */
+    --red-piece: #ff4d4d;
+    --black-piece: #00eeee; /* Đổi màu quân đen sang xanh neon nếu nền quá tối */
+}
+
+.board-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 10;
+    /* Cập nhật thuộc tính background để ảnh hiển thị đẹp hơn */
+    background-image: var(--board-bg);
+    background-size: cover;
+    background-position: center;
+    border: 4px solid #444;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    display: grid;
+    grid-template-columns: repeat(9, 11.11%);
+    grid-template-rows: repeat(10, 10%);
+    user-select: none;
+}
+
+/* Sửa màu đường kẻ trong SVG */
+.board-svg g {
+    stroke: var(--line-color) !important;
+    stroke-opacity: 0.8;
+}
+
+/* Sửa màu chữ SỞ HÀ - HÁN GIỚI để nổi bật trên nền ảnh */
+.board-svg text {
+    fill: #fff !important;
+}
+
+
+        body {
+            background-color: #0f172a; /* Nền ngoài tối màu */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: manipulation;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            color: white;
+        }
+
+        .game-wrapper {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .board-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 10;
+    /* Sử dụng biến đã khai báo ở :root hoặc chèn trực tiếp link ảnh tại đây */
+    background-image: var(--board-bg); 
+    background-size: cover;
+    background-position: center;
+    border: 4px solid #334155;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    display: grid;
+    grid-template-columns: repeat(9, 11.11%);
+    grid-template-rows: repeat(10, 10%);
+    user-select: none;
+}
+
+        /* Làm mờ nhẹ lớp nền để quân cờ nổi bật hơn */
+        .board-container::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.2); 
+            z-index: 1;
+        }
+
+        .board-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .cell {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .piece {
+            width: 88%;
+            height: 88%;
+            border-radius: 50%;
+            background-color: #1e293b; /* Quân cờ tối màu kiểu sci-fi */
+            border: 2px solid #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+            position: relative;
+            z-index: 20;
+        }
+
+        .piece.red { color: var(--red-piece); border-color: var(--red-piece); box-shadow: 0 0 10px rgba(255,77,77,0.3); }
+        .piece.black { color: var(--black-piece); border-color: var(--black-piece); box-shadow: 0 0 10px rgba(0,229,255,0.3); }
+        .piece.selected { transform: scale(1.15); box-shadow: 0 0 20px #facc15; border-width: 3px; z-index: 30; }
+
+        .hint {
+            width: 14px;
+            height: 14px;
+            background-color: rgba(34, 197, 94, 0.8);
+            border-radius: 50%;
+            z-index: 15;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        .captured-container {
+            min-height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed #475569;
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <header class="text-center flex justify-between items-center px-2">
+            <h1 class="text-xl font-bold text-gray-800">Cờ Tướng</h1>
+            <div id="game-status" class="text-sm font-bold bg-white px-3 py-1 rounded-full shadow-sm text-red-600 border border-red-200">Lượt: Đỏ</div>
+        </header>
+
+        <div class="flex flex-col gap-1">
+            <div class="flex justify-between items-center px-1">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Quân Đen đã ăn:</span>
+                <span id="black-score" class="text-[10px] font-mono text-gray-400">0 quân</span>
+            </div>
+            <div id="captured-red" class="captured-container"></div>
+        </div>
+
+        <div class="relative">
+            <div id="river-alert" class="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0 transition-opacity duration-500">
+                <span class="bg-red-600 text-white px-6 py-2 rounded-full text-2xl font-bold shadow-2xl ring-4 ring-white">CHIẾU TƯỚNG!</span>
+            </div>
+            
+            <div id="board" class="board-container">
+                <svg class="board-svg" viewBox="0 0 90 100" preserveAspectRatio="none">
+                    <g stroke="#333" stroke-width="0.5">
+                        <line x1="5" y1="5" x2="5" y2="95" />
+                        <line x1="15" y1="5" x2="15" y2="45" /> <line x1="15" y1="55" x2="15" y2="95" />
+                        <line x1="25" y1="5" x2="25" y2="45" /> <line x1="25" y1="55" x2="25" y2="95" />
+                        <line x1="35" y1="5" x2="35" y2="45" /> <line x1="35" y1="55" x2="35" y2="95" />
+                        <line x1="45" y1="5" x2="45" y2="45" /> <line x1="45" y1="55" x2="45" y2="95" />
+                        <line x1="55" y1="5" x2="55" y2="45" /> <line x1="55" y1="55" x2="55" y2="95" />
+                        <line x1="65" y1="5" x2="65" y2="45" /> <line x1="65" y1="55" x2="65" y2="95" />
+                        <line x1="75" y1="5" x2="75" y2="45" /> <line x1="75" y1="55" x2="75" y2="95" />
+                        <line x1="85" y1="5" x2="85" y2="95" />
+                        <line x1="5" y1="5" x2="85" y2="5" />
+                        <line x1="5" y1="15" x2="85" y2="15" />
+                        <line x1="5" y1="25" x2="85" y2="25" />
+                        <line x1="5" y1="35" x2="85" y2="35" />
+                        <line x1="5" y1="45" x2="85" y2="45" />
+                        <line x1="5" y1="55" x2="85" y2="55" />
+                        <line x1="5" y1="65" x2="85" y2="65" />
+                        <line x1="5" y1="75" x2="85" y2="75" />
+                        <line x1="5" y1="85" x2="85" y2="85" />
+                        <line x1="5" y1="95" x2="85" y2="95" />
+                        <line x1="35" y1="5" x2="55" y2="25" /> <line x1="55" y1="5" x2="35" y2="25" />
+                        <line x1="35" y1="75" x2="55" y2="95" /> <line x1="55" y1="75" x2="35" y2="95" />
+                    </g>
+                    <text x="23" y="51.5" font-size="4" fill="#666" font-weight="bold">SỞ HÀ</text>
+                    <text x="53" y="51.5" font-size="4" fill="#666" font-weight="bold">HÁN GIỚI</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <div class="flex justify-between items-center px-1">
+                <span class="text-[10px] font-bold text-red-700 uppercase tracking-wider">Quân Đỏ đã ăn:</span>
+                <span id="red-score" class="text-[10px] font-mono text-gray-400">0 quân</span>
+            </div>
+            <div id="captured-black" class="captured-container"></div>
+        </div>
+
+        <div class="mt-2 text-center">
+            <button id="reset-btn" class="bg-gray-800 hover:bg-black text-white px-10 py-2 rounded shadow text-sm font-bold transition">CHƠI MỚI</button>
+        </div>
+    </div>
+
+    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[200] flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded shadow-2xl text-center max-w-sm w-full border-t-4 border-blue-600">
+            <h2 id="alert-title" class="text-xl font-bold mb-2">Thông báo</h2>
+            <p id="alert-message" class="mb-6 text-gray-600 text-sm"></p>
+            <button onclick="closeAlert()" class="bg-blue-600 hover:bg-blue-700 text-white px-12 py-2 rounded font-bold transition">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const RED = 'red';
+        const BLACK = 'black';
+        const PIECES = {
+            KING: { red: '帥', black: '將' },
+            ADVISOR: { red: '仕', black: '士' },
+            ELEPHANT: { red: '相', black: '象' },
+            HORSE: { red: '馬', black: '馬' },
+            CHARIOT: { red: '車', black: '車' },
+            CANNON: { red: '砲', black: '炮' },
+            SOLDIER: { red: '兵', black: '卒' }
+        };
+
+        let boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+        let turn = RED;
+        let selected = null;
+        let hints = [];
+        let captured = { red: [], black: [] };
+
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('game-status');
+        const capRedEl = document.getElementById('captured-red');
+        const capBlackEl = document.getElementById('captured-black');
+        const redScoreEl = document.getElementById('red-score');
+        const blackScoreEl = document.getElementById('black-score');
+
+        function initGame() {
+            boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+            setupRow(0, BLACK, ['CHARIOT', 'HORSE', 'ELEPHANT', 'ADVISOR', 'KING', 'ADVISOR', 'ELEPHANT', 'HORSE', 'CHARIOT']);
+            setupRow(2, BLACK, [null, 'CANNON', null, null, null, null, null, 'CANNON', null]);
+            setupRow(3, BLACK, ['SOLDIER', null, 'SOLDIER', null, 'SOLDIER', null, 'SOLDIER', null, 'SOLDIER']);
+            setupRow(9, RED, ['CHARIOT', 'HORSE', 'ELEPHANT', 'ADVISOR', 'KING', 'ADVISOR', 'ELEPHANT', 'HORSE', 'CHARIOT']);
+            setupRow(7, RED, [null, 'CANNON', null, null, null, null, null, 'CANNON', null]);
+            setupRow(6, RED, ['SOLDIER', null, 'SOLDIER', null, 'SOLDIER', null, 'SOLDIER', null, 'SOLDIER']);
+            turn = RED;
+            selected = null;
+            hints = [];
+            captured = { red: [], black: [] };
+            render();
+            updateStatus();
+        }
+
+        function setupRow(r, color, rowPieces) {
+            rowPieces.forEach((p, c) => { if (p) boardState[r][c] = { type: p, color }; });
+        }
+
+        function showRiverAlert() {
+            const alertEl = document.getElementById('river-alert');
+            alertEl.classList.remove('opacity-0');
+            alertEl.classList.add('opacity-100');
+            setTimeout(() => {
+                alertEl.classList.remove('opacity-100');
+                alertEl.classList.add('opacity-0');
+            }, 500);
+        }
+
+        function render() {
+            // Chỉ xóa các thẻ .cell, giữ lại SVG bàn cờ
+            const oldCells = boardEl.querySelectorAll('.cell');
+            oldCells.forEach(cell => cell.remove());
+
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.onclick = () => handleCellClick(r, c);
+                    const piece = boardState[r][c];
+                    if (piece) {
+                        const pEl = document.createElement('div');
+                        pEl.className = `piece ${piece.color} ${selected && selected.r === r && selected.c === c ? 'selected' : ''}`;
+                        pEl.innerText = PIECES[piece.type][piece.color];
+                        cell.appendChild(pEl);
+                    }
+                    if (hints.some(h => h.r === r && h.c === c)) {
+                        const hint = document.createElement('div');
+                        hint.className = 'hint';
+                        cell.appendChild(hint);
+                    }
+                    boardEl.appendChild(cell);
+                }
+            }
+            
+            capRedEl.innerHTML = captured.red.map(p => `<div class="captured-piece text-red-600">${PIECES[p.type][RED]}</div>`).join('');
+            capBlackEl.innerHTML = captured.black.map(p => `<div class="captured-piece text-gray-800">${PIECES[p.type][BLACK]}</div>`).join('');
+            redScoreEl.innerText = `${captured.black.length} quân`;
+            blackScoreEl.innerText = `${captured.red.length} quân`;
+        }
+
+        function handleCellClick(r, c) {
+            if (selected && hints.some(h => h.r === r && h.c === c)) {
+                movePiece(selected.r, selected.c, r, c);
+                return;
+            }
+            const piece = boardState[r][c];
+            if (piece && piece.color === turn) {
+                selected = { r, c };
+                hints = getValidMoves(r, c);
+                render();
+            } else {
+                selected = null;
+                hints = [];
+                render();
+            }
+        }
+
+        function movePiece(fromR, fromC, toR, toC) {
+            const mover = boardState[fromR][fromC];
+            const target = boardState[toR][toC];
+            if (target) {
+                captured[target.color].push(target);
+            }
+            boardState[toR][toC] = mover;
+            boardState[fromR][fromC] = null;
+            selected = null;
+            hints = [];
+            turn = (turn === RED ? BLACK : RED);
+            render();
+            checkGameState();
+            updateStatus();
+        }
+
+        function getValidMoves(r, c, checkKingSafety = true) {
+            const piece = boardState[r][c];
+            if (!piece) return [];
+            let moves = [];
+            switch (piece.type) {
+                case 'KING': moves = getKingMoves(r, c, piece.color); break;
+                case 'ADVISOR': moves = getAdvisorMoves(r, c, piece.color); break;
+                case 'ELEPHANT': moves = getElephantMoves(r, c, piece.color); break;
+                case 'HORSE': moves = getHorseMoves(r, c, piece.color); break;
+                case 'CHARIOT': moves = getChariotMoves(r, c, piece.color); break;
+                case 'CANNON': moves = getCannonMoves(r, c, piece.color); break;
+                case 'SOLDIER': moves = getSoldierMoves(r, c, piece.color); break;
+            }
+            if (checkKingSafety) {
+                moves = moves.filter(m => {
+                    const temp = boardState[m.r][m.c];
+                    boardState[m.r][m.c] = piece;
+                    boardState[r][c] = null;
+                    const safe = !isKingInCheck(piece.color) && !isFaceToFace();
+                    boardState[r][c] = piece;
+                    boardState[m.r][m.c] = temp;
+                    return safe;
+                });
+            }
+            return moves;
+        }
+
+        function inBounds(r, c) { return r >= 0 && r < 10 && c >= 0 && c < 9; }
+        function isEmpty(r, c) { return boardState[r][c] === null; }
+        function isEnemy(r, c, myColor) { return boardState[r][c] && boardState[r][c].color !== myColor; }
+        function isFriend(r, c, myColor) { return boardState[r][c] && boardState[r][c].color === myColor; }
+        function inPalace(r, c, color) {
+            return (c >= 3 && c <= 5) && (color === RED ? (r >= 7 && r <= 9) : (r >= 0 && r <= 2));
+        }
+
+        function getKingMoves(r, c, color) {
+            return [[0,1],[0,-1],[1,0],[-1,0]].map(s => ({r: r+s[0], c: c+s[1]}))
+                .filter(m => inBounds(m.r, m.c) && inPalace(m.r, m.c, color) && !isFriend(m.r, m.c, color));
+        }
+
+        function getAdvisorMoves(r, c, color) {
+            return [[1,1],[1,-1],[-1,1],[-1,-1]].map(s => ({r: r+s[0], c: c+s[1]}))
+                .filter(m => inBounds(m.r, m.c) && inPalace(m.r, m.c, color) && !isFriend(m.r, m.c, color));
+        }
+
+        function getElephantMoves(r, c, color) {
+            const moves = [];
+            [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(s => {
+                const tr = r + s[0], tc = c + s[1];
+                const mr = r + s[0]/2, mc = c + s[1]/2;
+                const overRiver = color === RED ? tr < 5 : tr > 4;
+                if (inBounds(tr, tc) && !overRiver && isEmpty(mr, mc) && !isFriend(tr, tc, color)) moves.push({r: tr, c: tc});
+            });
+            return moves;
+        }
+
+        function getHorseMoves(r, c, color) {
+            const moves = [];
+            const steps = [{t:[-2,-1],b:[-1,0]},{t:[-2,1],b:[-1,0]},{t:[2,-1],b:[1,0]},{t:[2,1],b:[1,0]},{t:[-1,-2],b:[0,-1]},{t:[1,-2],b:[0,-1]},{t:[-1,2],b:[0,1]},{t:[1,2],b:[0,1]}];
+            steps.forEach(s => {
+                const tr = r+s.t[0], tc = c+s.t[1];
+                const br = r+s.b[0], bc = c+s.b[1];
+                if (inBounds(tr, tc) && isEmpty(br, bc) && !isFriend(tr, tc, color)) moves.push({r: tr, c: tc});
+            });
+            return moves;
+        }
+
+        function getChariotMoves(r, c, color) {
+            const moves = [];
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
+                let nr = r+d[0], nc = c+d[1];
+                while(inBounds(nr, nc)) {
+                    if (isEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                    else { if (isEnemy(nr, nc, color)) moves.push({r: nr, c: nc}); break; }
+                    nr += d[0]; nc += d[1];
+                }
+            });
+            return moves;
+        }
+
+        function getCannonMoves(r, c, color) {
+            const moves = [];
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
+                let nr = r+d[0], nc = c+d[1], hasPlatform = false;
+                while(inBounds(nr, nc)) {
+                    if (!hasPlatform) {
+                        if (isEmpty(nr, nc)) moves.push({r: nr, c: nc}); else hasPlatform = true;
+                    } else {
+                        if (!isEmpty(nr, nc)) { if (isEnemy(nr, nc, color)) moves.push({r: nr, c: nc}); break; }
+                    }
+                    nr += d[0]; nc += d[1];
+                }
+            });
+            return moves;
+        }
+
+        function getSoldierMoves(r, c, color) {
+            const moves = [];
+            const forward = color === RED ? -1 : 1;
+            if (inBounds(r + forward, c) && !isFriend(r + forward, c, color)) moves.push({r: r + forward, c});
+            if ((color === RED ? r < 5 : r > 4)) {
+                if (inBounds(r, c + 1) && !isFriend(r, c + 1, color)) moves.push({r, c: c + 1});
+                if (inBounds(r, c - 1) && !isFriend(r, c - 1, color)) moves.push({r, c: c - 1});
+            }
+            return moves;
+        }
+
+        function findKing(color) {
+            for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+                const p = boardState[r][c]; if (p && p.type === 'KING' && p.color === color) return {r, c};
+            }
+            return null;
+        }
+
+        function isKingInCheck(color) {
+            const kp = findKing(color); if (!kp) return false;
+            const enemy = color === RED ? BLACK : RED;
+            for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+                const p = boardState[r][c];
+                if (p && p.color === enemy) {
+                    if (getValidMoves(r, c, false).some(m => m.r === kp.r && m.c === kp.c)) return true;
+                }
+            }
+            return false;
+        }
+
+        function isFaceToFace() {
+            const rk = findKing(RED), bk = findKing(BLACK);
+            if (!rk || !bk || rk.c !== bk.c) return false;
+            for (let r = Math.min(rk.r, bk.r) + 1; r < Math.max(rk.r, bk.r); r++) if (boardState[r][rk.c]) return false;
+            return true;
+        }
+
+        function checkGameState() {
+            const enemyColor = turn;
+            if (isKingInCheck(enemyColor)) {
+                let canEscape = false;
+                for (let r = 0; r < 10; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        const p = boardState[r][c];
+                        if (p && p.color === enemyColor && getValidMoves(r, c, true).length > 0) { 
+                            canEscape = true; break; 
+                        }
+                    }
+                    if (canEscape) break;
+                }
+
+                if (!canEscape) {
+                    showAlert("CHIẾU BÍ!", `Bên ${enemyColor === RED ? 'Đen' : 'Đỏ'} thắng!`);
+                } else {
+                    showRiverAlert();
+                }
+            }
+        }
+
+        function updateStatus() {
+            statusEl.innerText = `Lượt: ${turn === RED ? 'Đỏ' : 'Đen'}`;
+            statusEl.className = `text-sm font-bold bg-white px-3 py-1 rounded-full shadow-sm border ${turn === RED ? 'text-red-600 border-red-200' : 'text-gray-800 border-gray-200'}`;
+        }
+
+        function showAlert(title, msg) {
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = msg;
+            document.getElementById('alert-modal').classList.remove('hidden');
+        }
+
+        function closeAlert() { document.getElementById('alert-modal').classList.add('hidden'); }
+
+        document.getElementById('reset-btn').onclick = initGame;
+        window.onload = initGame;
+    </script>
+</body>
+</html>

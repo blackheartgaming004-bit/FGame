@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cờ Vua</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --white-sq: #9e9a77;
+            --black-sq: #a52a2a;
+            --highlight: rgba(255, 255, 0, 0.4);
+            --valid-move: rgba(0, 255, 0, 0.3);
+            --check-color: rgba(255, 0, 0, 0.7);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+            overflow:hidden;
+        }
+
+        .status-container, .controls {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+    margin: 10px 0;
+}
+        #turn-indicator {
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            margin-bottom: 5px;
+        }
+
+        #game-msg {
+            font-size: 1.1rem;
+            color: #f1c40f;
+            height: 1.5rem;
+            font-weight: bold;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 5px solid #34495e;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        @media (max-width: 500px) {
+            .board {
+                grid-template-columns: repeat(8, 11vw);
+                grid-template-rows: repeat(8, 11vw);
+            }
+        }
+
+        .square {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+
+        .white-sq { background-color: var(--white-sq); }
+        .black-sq { background-color: var(--black-sq); }
+
+        .piece {
+            transition: transform 0.4s ease-in-out;
+            z-index: 2;
+        }
+
+        .piece.white { color: #fff; text-shadow: 0 0 5px #000; }
+        .piece.black { color: #000; text-shadow: 0 0 2px #fff; }
+
+        .flipped { transform: rotate(180deg); }
+
+        .selected { background-color: var(--highlight) !important; }
+        .in-check { background-color: var(--check-color) !important; border-radius: 50%; }
+
+        .valid-move::after {
+            content: '';
+            width: 18px;
+            height: 18px;
+            background-color: var(--valid-move);
+            border-radius: 50%;
+            position: absolute;
+            z-index: 3;
+        }
+
+        .controls { margin-top: 20px; }
+
+        button {
+            padding: 10px 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        button:hover { background: #c0392b; }
+        .captured-piece {
+            opacity: 0.8;
+            cursor: default;
+        }
+        .captured-piece.white { color: #fff; text-shadow: 0 0 2px #000; }
+        .captured-piece.black { color: #000; text-shadow: 0 0 1px #fff; }
+.promotion-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+.promotion-options {
+    background: #34495e;
+    padding: 20px;
+    border-radius: 10px;
+    display: flex;
+    gap: 15px;
+}
+.promotion-option {
+    font-size: 3rem;
+    cursor: pointer;
+    padding: 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 5px;
+}
+.promotion-option:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+
+      <video autoplay muted loop playsinline id="bg-video" style="position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -1; object-fit: cover; filter: brightness(40%); pointer-events: none;">
+    <source src="background_web.mp4" type="video/mp4">
+    Trình duyệt của bạn không hỗ trợ video.
+</video>
+
+     <div id="captured-black" style="display: flex; gap: 5px; height: 30px; margin-bottom: 10px; font-size: 1.5rem;"></div>
+    <div class="status-container">
+        <div id="turn-indicator">Lượt đi: Trắng</div>
+        <div id="game-msg"></div>
+    </div>
+
+    <div id="board" class="board"></div>
+
+<div id="captured-white" style="display: flex; gap: 5px; height: 30px; margin-top: 10px; font-size: 1.5rem;"></div>
+
+    <div class="controls">
+        <button onclick="resetGame()">Ván mới</button>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const turnIndicator = document.getElementById('turn-indicator');
+        const gameMsg = document.getElementById('game-msg');
+
+        let board = [];
+        let turn = 'white';
+        let selectedSquare = null;
+        let validMoves = [];
+        let isGameOver = false;
+        let capturedWhite = [];
+        let capturedBlack = [];
+
+        const PIECES = {
+            white: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
+            black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' }
+        };
+
+        function initBoard() {
+            board = Array(8).fill(null).map(() => Array(8).fill(null));
+            const layout = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
+            
+            for (let i = 0; i < 8; i++) {
+                board[0][i] = { type: layout[i], color: 'black' };
+                board[1][i] = { type: 'pawn', color: 'black' };
+                board[6][i] = { type: 'pawn', color: 'white' };
+                board[7][i] = { type: layout[i], color: 'white' };
+            }
+            isGameOver = false;
+            turn = 'white';
+            selectedSquare = null;
+            validMoves = [];
+            gameMsg.innerText = "";
+            render();
+        }
+
+        function render() {
+            boardElement.innerHTML = '';
+            const kingInCheckColor = findKingInCheck();
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const square = document.createElement('div');
+                    square.className = `square ${(r + c) % 2 === 0 ? 'white-sq' : 'black-sq'}`;
+                    
+                    const pieceData = board[r][c];
+                    if (pieceData) {
+                        const pieceDiv = document.createElement('div');
+                        pieceDiv.className = `piece ${pieceData.color}`;
+                        pieceDiv.innerText = PIECES[pieceData.color][pieceData.type];
+                        if (turn === 'black') pieceDiv.classList.add('flipped');
+                        square.appendChild(pieceDiv);
+
+                        if (pieceData.type === 'king' && kingInCheckColor === pieceData.color) {
+                            square.classList.add('in-check');
+                        }
+                    }
+
+                    if (selectedSquare && selectedSquare.r === r && selectedSquare.c === c) {
+                        square.classList.add('selected');
+                    }
+
+                    if (validMoves.some(m => m.r === r && m.c === c)) {
+                        square.classList.add('valid-move');
+                    }
+
+                    square.onclick = () => handleSquareClick(r, c);
+                    boardElement.appendChild(square);
+                }
+            }
+            turnIndicator.innerText = `Lượt đi: ${turn === 'white' ? 'Trắng' : 'Đen'}`;
+            turnIndicator.style.background = turn === 'white' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.4)';
+        }
+
+        function renderCaptured() {
+    // Hoán đổi: quân TRẮNG bị ăn sẽ hiện ở ô phía trên (blackBox cũ)
+    // Quân ĐEN bị ăn sẽ hiện ở ô phía dưới (whiteBox cũ)
+    const topBox = document.getElementById('captured-black'); 
+    const bottomBox = document.getElementById('captured-white');
+    
+    // Hiển thị quân Trắng bị ăn ở phía trên
+    topBox.innerHTML = capturedWhite.map(p => `<span class="captured-piece white">${PIECES.white[p]}</span>`).join('');
+    
+    // Hiển thị quân Đen bị ăn ở phía dưới
+    bottomBox.innerHTML = capturedBlack.map(p => `<span class="captured-piece black">${PIECES.black[p]}</span>`).join('');
+}
+
+        function isInside(r, c) {
+            return r >= 0 && r < 8 && c >= 0 && c < 8;
+        }
+
+        function getRawMoves(r, c, currentBoard) {
+            const piece = currentBoard[r][c];
+            if (!piece) return [];
+            let moves = [];
+            
+            const rookDirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            const bishopDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+            const knightDirs = [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+            const kingDirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+            if (piece.type === 'pawn') {
+                const d = piece.color === 'white' ? -1 : 1;
+                // Pawn raw moves are only for attack detection here
+                if (isInside(r+d, c+1)) moves.push({r: r+d, c: c+1});
+                if (isInside(r+d, c-1)) moves.push({r: r+d, c: c-1});
+            } else if (piece.type === 'knight') {
+                knightDirs.forEach(dir => {
+                    const nr = r + dir[0], nc = c + dir[1];
+                    if (isInside(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else if (piece.type === 'king') {
+                kingDirs.forEach(dir => {
+                    const nr = r + dir[0], nc = c + dir[1];
+                    if (isInside(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else {
+                // Rook, Bishop, Queen
+                let activeDirs = [];
+                if (piece.type === 'rook') activeDirs = rookDirs;
+                if (piece.type === 'bishop') activeDirs = bishopDirs;
+                if (piece.type === 'queen') activeDirs = [...rookDirs, ...bishopDirs];
+
+                activeDirs.forEach(dir => {
+                    let nr = r + dir[0], nc = c + dir[1];
+                    while (isInside(nr, nc)) {
+                        moves.push({r: nr, c: nc});
+                        if (currentBoard[nr][nc]) break;
+                        nr += dir[0]; nc += dir[1];
+                    }
+                });
+            }
+            return moves;
+        }
+
+        function findKing(color, currentBoard = board) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = currentBoard[r][c];
+                    if (p && p.type === 'king' && p.color === color) return { r, c };
+                }
+            }
+            return null;
+        }
+
+        function isSquareAttacked(r, c, attackerColor, currentBoard = board) {
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const p = currentBoard[row][col];
+                    if (p && p.color === attackerColor) {
+                        const moves = getRawMoves(row, col, currentBoard);
+                        if (moves.some(m => m.r === r && m.c === c)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function findKingInCheck() {
+            const whiteKing = findKing('white');
+            const blackKing = findKing('black');
+            if (whiteKing && isSquareAttacked(whiteKing.r, whiteKing.c, 'black')) return 'white';
+            if (blackKing && isSquareAttacked(blackKing.r, blackKing.c, 'white')) return 'black';
+            return null;
+        }
+
+        function getLegalMoves(r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            
+            let candidates = [];
+            if (piece.type === 'pawn') {
+                const d = piece.color === 'white' ? -1 : 1;
+                if (isInside(r+d, c) && !board[r+d][c]) {
+                    candidates.push({r: r+d, c});
+                    const start = piece.color === 'white' ? 6 : 1;
+                    if (r === start && !board[r+2*d][c]) candidates.push({r: r+2*d, c});
+                }
+                [[d, 1], [d, -1]].forEach(off => {
+                    const nr = r+off[0], nc = c+off[1];
+                    if (isInside(nr, nc) && board[nr][nc] && board[nr][nc].color !== piece.color) {
+                        candidates.push({r: nr, c: nc});
+                    }
+                });
+            } else {
+                candidates = getRawMoves(r, c, board).filter(m => !board[m.r][m.c] || board[m.r][m.c].color !== piece.color);
+            }
+
+            // Lọc các nước đi khiến vua bị chiếu (luật cờ vua)
+            return candidates.filter(m => {
+                const originalTo = board[m.r][m.c];
+                const originalFrom = board[r][c];
+                board[m.r][m.c] = originalFrom;
+                board[r][c] = null;
+                
+                const kingPos = findKing(piece.color);
+                const stillCheck = isSquareAttacked(kingPos.r, kingPos.c, piece.color === 'white' ? 'black' : 'white');
+                
+                // Trả lại trạng thái cũ
+                board[r][c] = originalFrom;
+                board[m.r][m.c] = originalTo;
+                return !stillCheck;
+            });
+        }
+
+        function hasLegalMoves(color) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === color) {
+                        if (getLegalMoves(r, c).length > 0) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function handleSquareClick(r, c) {
+            if (isGameOver) return;
+            const piece = board[r][c];
+
+            if (selectedSquare) {
+                const move = validMoves.find(m => m.r === r && m.c === c);
+                if (move) {
+                    executeMove(selectedSquare.r, selectedSquare.c, r, c);
+                    return;
+                }
+            }
+
+            if (piece && piece.color === turn) {
+                selectedSquare = { r, c };
+                validMoves = getLegalMoves(r, c);
+                render();
+            } else {
+                selectedSquare = null;
+                validMoves = [];
+                render();
+            }
+        }
+function showPromotionMenu(color) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'promotion-overlay';
+        
+        const menu = document.createElement('div');
+        menu.className = 'promotion-options';
+        
+        // Danh sách các quân được phép chọn: Hậu, Xe, Tượng, Mã
+        const options = ['queen', 'rook', 'bishop', 'knight'];
+        
+        options.forEach(type => {
+            const btn = document.createElement('div');
+            btn.className = `promotion-option ${color}`;
+            btn.innerText = PIECES[color][type];
+            btn.onclick = () => {
+                document.body.removeChild(overlay);
+                resolve(type);
+            };
+            menu.appendChild(btn);
+        });
+        
+        overlay.appendChild(menu);
+        document.body.appendChild(overlay);
+    });
+}
+
+        async function executeMove(fR, fC, tR, tC) {
+    const movingPiece = board[fR][fC];
+    const targetPiece = board[tR][tC];
+
+    // Lưu quân bị ăn
+    if (targetPiece) {
+        if (targetPiece.color === 'white') capturedWhite.push(targetPiece.type);
+        else capturedBlack.push(targetPiece.type);
+        renderCaptured();
+    }
+
+    // Thực hiện di chuyển
+    board[tR][tC] = movingPiece;
+    board[fR][fC] = null;
+
+    // KIỂM TRA PHONG CẤP
+    if (movingPiece.type === 'pawn' && (tR === 0 || tR === 7)) {
+        render(); // Cập nhật bàn cờ trước khi hiện bảng chọn
+        const newType = await showPromotionMenu(movingPiece.color);
+        board[tR][tC].type = newType;
+    }
+
+    // Đổi lượt và kiểm tra trạng thái game
+    turn = turn === 'white' ? 'black' : 'white';
+    selectedSquare = null;
+    validMoves = [];
+    
+    updateGameStatus();
+    render();
+}
+
+// Hàm phụ để tách phần kiểm tra thắng thua
+function updateGameStatus() {
+    const kingInCheck = findKingInCheck();
+    if (kingInCheck === turn) {
+        if (!hasLegalMoves(turn)) {
+            isGameOver = true;
+            gameMsg.innerText = `CHIẾU HẾT! ${turn === 'white' ? 'Đen' : 'Trắng'} thắng!`;
+        } else {
+            gameMsg.innerText = "ĐANG CHIẾU!";
+        }
+    } else {
+        if (!hasLegalMoves(turn)) {
+            isGameOver = true;
+            gameMsg.innerText = "HÒA CỜ (STALEMATE)!";
+        } else {
+            gameMsg.innerText = "";
+        }
+    }
+}
+
+        function resetGame() { 
+capturedWhite = [];
+capturedBlack = [];
+renderCaptured();
+initBoard(); }
+
+        window.onload = initBoard;
+document.addEventListener('DOMContentLoaded', function() {
+    const video = document.getElementById('bg-video');
+    
+    // Thử phát video
+    const playPromise = video.play();
+
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            // Trình duyệt chặn tự động phát, video sẽ chạy sau khi người dùng click
+            console.log("Autoplay bị chặn bởi trình duyệt. Video sẽ chạy sau tương tác người dùng.");
+            
+            const startVideo = () => {
+                video.play();
+                document.removeEventListener('click', startVideo);
+            };
+            document.addEventListener('click', startVideo);
+        });
+    }
+});
+    </script>
+</body>
+</html>
